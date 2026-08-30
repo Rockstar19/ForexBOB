@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dólar Blue Bolivia — Velas</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1420; --panel:#151D2E; --panel2:#1B2438;
+    --ink:#E8ECF4; --muted:#7C8AA5; --grid:#223047;
+    --up:#2FBF71; --down:#E4574C; --amber:#F2A93B;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+    --sans:'Montserrat','Lato','Century Gothic',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column}
+  header{padding:18px 22px 12px;display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;justify-content:space-between}
+  .title h1{font-size:19px;font-weight:800;letter-spacing:.4px}
+  .title h1 span{color:var(--amber)}
+  .title p{color:var(--muted);font-size:12px;margin-top:3px}
+  .stats{display:flex;gap:14px;flex-wrap:wrap}
+  .stat{background:var(--panel);border:1px solid var(--grid);border-radius:10px;padding:9px 14px;min-width:108px}
+  .stat .lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600}
+  .stat .val{font-family:var(--mono);font-size:20px;font-weight:600;margin-top:2px}
+  .stat .sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:1px}
+  .stat.gap .val{color:var(--amber)}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:4px 22px 12px}
+  .group{display:flex;background:var(--panel);border:1px solid var(--grid);border-radius:9px;overflow:hidden}
+  .group button{background:none;border:none;color:var(--muted);font-family:var(--sans);font-weight:600;font-size:12.5px;padding:8px 13px;cursor:pointer;transition:background .15s,color .15s}
+  .group button:hover{color:var(--ink)}
+  .group button.on{background:var(--panel2);color:var(--ink)}
+  .group.tf button.on{color:var(--amber)}
+  .group.cur button{font-size:13px;padding:9px 15px}
+  .group.cur button.on{background:var(--panel2);color:var(--amber)}
+  .databtn.load{border-color:var(--amber);color:var(--amber)}
+  .databtn.load:hover{background:rgba(242,169,59,.12)}
+  .chk{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;user-select:none;background:var(--panel);border:1px solid var(--grid);border-radius:9px;padding:8px 13px}
+  .chk input{accent-color:var(--amber);cursor:pointer}
+  .spacer{flex:1}
+  .range-note{color:var(--muted);font-size:11.5px;font-family:var(--mono)}
+  .databtn{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--grid);color:var(--ink);font-family:var(--sans);font-weight:600;font-size:12.5px;padding:8px 13px;border-radius:9px;cursor:pointer;transition:border-color .15s,background .15s}
+  .databtn:hover{border-color:var(--amber)}
+  .databtn.reset:hover{border-color:var(--down)}
+  .databtn svg{width:14px;height:14px;flex:none}
+  #fileInput{display:none}
+  #chart{flex:1;min-height:420px;margin:0 12px 8px;position:relative}
+  #legend{position:absolute;top:10px;left:14px;z-index:5;font-family:var(--mono);font-size:12px;background:rgba(14,20,32,.82);border:1px solid var(--grid);border-radius:8px;padding:7px 11px;pointer-events:none;line-height:1.55;display:none}
+  #legend .o{color:var(--muted)} #legend b{font-weight:600}
+  #overlay{position:absolute;inset:0;background:rgba(14,20,32,.88);display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;z-index:10;border-radius:6px}
+  #overlay.on{display:flex}
+  .spin{width:26px;height:26px;border-radius:50%;border:3px solid var(--grid);border-top-color:var(--amber);animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  #overlay p{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  #dropHint{position:absolute;inset:0;border:2px dashed var(--amber);border-radius:6px;background:rgba(242,169,59,.08);display:none;align-items:center;justify-content:center;z-index:9;pointer-events:none}
+  #dropHint.on{display:flex}
+  #dropHint span{font-family:var(--sans);font-weight:700;font-size:14px;color:var(--amber)}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel2);border:1px solid var(--grid);color:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:600;padding:10px 18px;border-radius:9px;opacity:0;transition:opacity .25s,transform .25s;z-index:20;pointer-events:none}
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.err{border-color:var(--down);color:#FFD3CF}
+  footer{padding:8px 22px 14px;color:var(--muted);font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
+  footer .k{font-family:var(--mono)}
+  .drawbar{padding-top:0}
+  #drawToolGroup button{padding:8px 11px}
+  #drawToolGroup button svg{width:16px;height:16px;display:block}
+  #drawToolGroup button.on{color:var(--amber)}
+  .palette{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--grid);border-radius:9px;padding:7px 9px}
+  .swatch{width:20px;height:20px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;flex:none;transition:transform .12s,border-color .12s}
+  .swatch:hover{transform:scale(1.15)}
+  .swatch.on{border-color:var(--ink)}
+  #widthGroup button{font-family:var(--mono);font-size:11.5px}
+  #drawCanvas{position:absolute;inset:0;z-index:4;pointer-events:none;touch-action:none}
+  .draw-hint{color:var(--muted);font-size:11px;font-family:var(--mono)}
+  .indicator{gap:8px}
+  .indicator label{cursor:pointer}
+  .periodInput{width:44px;background:var(--panel2);border:1px solid var(--grid);color:var(--ink);font-family:var(--mono);font-size:11.5px;border-radius:5px;padding:3px 4px;text-align:center}
+  .periodInput:focus{outline:1px solid var(--amber)}
+  .zoomctl{position:absolute;right:12px;bottom:14px;z-index:6;display:flex;flex-direction:column;gap:1px;background:var(--panel);border:1px solid var(--grid);border-radius:9px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  .zoomctl button{background:none;border:none;color:var(--muted);padding:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+  .zoomctl button:hover{background:var(--panel2);color:var(--amber)}
+  .zoomctl button svg{width:16px;height:16px}
+  .zoomctl button+button{border-top:1px solid var(--grid)}
+  .tutorial{max-width:900px;margin:8px auto 40px;padding:0 22px}
+  .tutorial h2{font-size:16px;font-weight:800;letter-spacing:.3px;margin:0 0 4px}
+  .tutorial h2 span{color:var(--amber)}
+  .tutorial>p.lead{color:var(--muted);font-size:12.5px;margin-bottom:18px}
+  .tutorial .card{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+  .tutorial h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--amber);margin-bottom:8px}
+  .tutorial p{font-size:13px;line-height:1.65;color:var(--ink);margin-bottom:8px}
+  .tutorial p:last-child{margin-bottom:0}
+  .tutorial .formula{font-family:var(--mono);font-size:12.5px;background:var(--panel2);border:1px solid var(--grid);border-radius:8px;padding:8px 12px;margin:8px 0;color:var(--amber);overflow-x:auto}
+  .tutorial ol,.tutorial ul{margin:6px 0 6px 20px;font-size:13px;line-height:1.7;color:var(--ink)}
+  .tutorial ol li,.tutorial ul li{margin-bottom:4px}
+  .tutorial .levels{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .tutorial .lvl{font-family:var(--mono);font-size:11.5px;background:var(--panel2);border:1px solid var(--grid);border-radius:20px;padding:4px 11px;color:var(--muted)}
+  .tutorial .lvl b{color:var(--ink)}
+  .tutorial .warn{border-left:3px solid var(--amber);padding-left:12px;color:var(--muted);font-size:12.5px;font-style:italic}
+  .calc{max-width:900px;margin:8px auto 20px;padding:0 22px}
+  .calc h2{font-size:16px;font-weight:800;letter-spacing:.3px;margin:0 0 4px}
+  .calc h2 span{color:var(--amber)}
+  .calc>p.lead{color:var(--muted);font-size:12.5px;margin-bottom:18px}
+  .calc .box{background:var(--panel);border:1px solid var(--grid);border-radius:12px;padding:18px;margin-bottom:14px}
+  .calcgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+  .field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin-bottom:6px}
+  .field input,.field select{width:100%;background:var(--panel2);border:1px solid var(--grid);color:var(--ink);
+    font-family:var(--mono);font-size:14px;border-radius:8px;padding:9px 11px}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--amber)}
+  .opgroup{display:flex;background:var(--panel2);border:1px solid var(--grid);border-radius:8px;overflow:hidden}
+  .opgroup button{flex:1;background:none;border:none;color:var(--muted);font-family:var(--sans);font-weight:600;
+    font-size:12.5px;padding:9px 6px;cursor:pointer;transition:background .15s,color .15s}
+  .opgroup button.on{background:var(--grid);color:var(--amber)}
+  .calcbtn{margin-top:14px;width:100%;background:var(--amber);border:none;color:#0E1420;font-family:var(--sans);
+    font-weight:800;font-size:13.5px;padding:12px;border-radius:9px;cursor:pointer;letter-spacing:.3px}
+  .calcbtn:hover{filter:brightness(1.08)}
+  .result{margin-top:16px;display:none}
+  .result.on{display:block}
+  .rline{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px solid var(--grid);flex-wrap:wrap}
+  .rline:last-child{border-bottom:none}
+  .rline .k{font-size:12px;color:var(--muted);font-weight:600}
+  .rline .v{font-family:var(--mono);font-size:17px;font-weight:600}
+  .rline.big .v{font-size:22px;color:var(--amber)}
+  .rnote{font-size:11.5px;color:var(--muted);font-family:var(--mono);margin-top:10px;line-height:1.6}
+  .rwarn{color:#FFCF8B}
+  .calc .formula{font-family:var(--mono);font-size:12.5px;background:var(--panel2);border:1px solid var(--grid);
+    border-radius:8px;padding:8px 12px;margin:8px 0;color:var(--amber);overflow-x:auto}
+  .calc .expl{font-size:13px;line-height:1.65;color:var(--ink);margin-bottom:8px}
+  .calc h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--amber);margin-bottom:8px}
+  .srclinks{display:flex;flex-direction:column;gap:8px}
+  .srclinks a{display:inline-block;background:var(--panel2);border:1px solid var(--grid);border-radius:8px;
+    padding:10px 13px;color:var(--ink);text-decoration:none;font-size:13px;font-weight:600;transition:border-color .15s,color .15s}
+  .srclinks a:hover{border-color:var(--amber);color:var(--amber)}
+  .statusrow{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px}
+  .statusrow .pill{font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;flex:none}
+  .statusrow .pill.ok{background:rgba(47,191,113,.16);color:var(--up)}
+  .statusrow .pill.no{background:rgba(228,87,76,.16);color:var(--down)}
+  .statusrow .nm{font-weight:600}
+  .statusrow .dt{color:var(--muted);font-family:var(--mono);font-size:11.5px;margin-left:auto}
+  .calcbtn:disabled{background:var(--grid);color:var(--muted);cursor:not-allowed;filter:none}
+  @media(max-width:640px){
+    .stats{width:100%}.stat{flex:1;min-width:90px;padding:8px 10px}.stat .val{font-size:16px}
+    header{padding:14px 14px 8px}.toolbar{padding:2px 14px 10px}#chart{margin:0 4px 4px}
+    .palette{order:3;width:100%;justify-content:flex-start}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">
+    <h1 id="pageTitle">VISOR <span>MULTI-DIVISA</span></h1>
+    <p id="subtitle">Velas japonesas · elegí una divisa y cargá su CSV</p>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="lbl" id="lbl1">Último</div><div class="val" id="sSell">—</div><div class="sub" id="sSellCh">—</div></div>
+    <div class="stat" id="statBuy"><div class="lbl" id="lbl2">Compra</div><div class="val" id="sBuy">—</div></div>
+    <div class="stat" id="statOff"><div class="lbl">Oficial</div><div class="val" id="sOff">—</div></div>
+    <div class="stat gap" id="statGap"><div class="lbl">Brecha</div><div class="val" id="sGap">—</div><div class="sub">blue vs. oficial</div></div>
+  </div>
+</header>
+
+<div class="toolbar" id="currencyBar">
+  <div class="group cur" id="curGroup">
+    <button data-cur="bob" class="on">🇧🇴 Bs blue</button>
+    <button data-cur="clp">🇨🇱 USD/CLP</button>
+    <button data-cur="pen">🇵🇪 USD/PEN</button>
+    <button data-cur="arsb">🇦🇷 USD/ARS blue</button>
+  </div>
+  <button class="databtn load" id="loadBtn" title="Cargar el CSV de la divisa seleccionada">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
+    Cargar CSV
+  </button>
+  <input type="file" id="fileInput" accept=".csv,text/csv">
+  <div class="range-note" id="loadHint">Boliviano: formato de 15 min. Otras divisas: formato diario de Investing.com.</div>
+</div>
+
+<div class="toolbar">
+  <div class="group tf" id="tfGroup">
+    <button data-tf="1h">1 h</button>
+    <button data-tf="5h">5 h</button>
+    <button data-tf="1d" class="on">1 día</button>
+    <button data-tf="1w">1 sem</button>
+    <button data-tf="1M">1 mes</button>
+  </div>
+  <div class="group" id="serieGroup" style="display:none">
+    <button data-s="sell" class="on">Venta</button>
+    <button data-s="buy">Compra</button>
+  </div>
+  <label class="chk" id="offChk"><input type="checkbox" id="offToggle" checked> Línea oficial</label>
+  <div class="chk indicator">
+    <input type="checkbox" id="smaToggle">
+    <label for="smaToggle">SMA</label>
+    <input type="number" id="smaPeriod" class="periodInput" value="20" min="2" max="500" title="Período de la SMA, en velas">
+  </div>
+  <div class="chk indicator">
+    <input type="checkbox" id="emaToggle">
+    <label for="emaToggle">EMA</label>
+    <input type="number" id="emaPeriod" class="periodInput" value="12" min="2" max="500" title="Período de la EMA, en velas">
+  </div>
+  <div class="spacer"></div>
+  <button class="databtn reset" id="clearAllBtn" title="Limpiar los trazos de dibujo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v6h6M20 20v-6h-6M4.5 15a8 8 0 0014.5 3.5M19.5 9a8 8 0 00-14.5-3.5"/></svg>
+    Ajustar vista
+  </button>
+  <div class="range-note" id="candCount"></div>
+</div>
+
+<div class="toolbar drawbar" id="drawBar">
+  <div class="group" id="drawToolGroup">
+    <button data-tool="cursor" class="on" title="Cursor: desplazar y hacer zoom">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l6.5 17 2-7 7-2L5 3z"/></svg>
+    </button>
+    <button data-tool="line" title="Línea recta: tocá y arrastrá">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L19 5"/></svg>
+    </button>
+    <button data-tool="free" title="Dibujo libre: tocá y arrastrá">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16c2-5 3-1 5-6s3-1 5-6 3-1 5-3"/></svg>
+    </button>
+    <button data-tool="fib" title="Fibonacci: tocá el punto inicial y arrastrá al final">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18M3 9.5h13M3 14h18M3 18.5h9"/></svg>
+    </button>
+  </div>
+  <div class="palette" id="palette">
+    <button class="swatch on" data-color="#FFFFFF" style="background:#FFFFFF" title="Blanco"></button>
+    <button class="swatch" data-color="#F2A93B" style="background:#F2A93B" title="Ámbar"></button>
+    <button class="swatch" data-color="#4FC3F7" style="background:#4FC3F7" title="Celeste"></button>
+    <button class="swatch" data-color="#B388FF" style="background:#B388FF" title="Violeta"></button>
+    <button class="swatch" data-color="#F06FA6" style="background:#F06FA6" title="Rosa"></button>
+    <button class="swatch" data-color="#FFE066" style="background:#FFE066" title="Amarillo"></button>
+    <button class="swatch" data-color="#6FDDA0" style="background:#6FDDA0" title="Menta"></button>
+    <button class="swatch" data-color="#FF6B6B" style="background:#FF6B6B" title="Coral"></button>
+  </div>
+  <div class="group" id="widthGroup">
+    <button data-w="1.5" class="on">Fino</button>
+    <button data-w="3.5">Grueso</button>
+  </div>
+  <button class="databtn" id="undoBtn" title="Deshacer el último trazo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14l-5-5 5-5M4 9h10a6 6 0 010 12h-2"/></svg>
+    Deshacer
+  </button>
+  <button class="databtn reset" id="clearDrawBtn" title="Borrar todos los trazos">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3m-8 0l1 13a1 1 0 001 1h6a1 1 0 001-1l1-13"/></svg>
+    Borrar
+  </button>
+  <div class="spacer"></div>
+  <div class="draw-hint" id="drawHintText">cursor activo · elegí línea o libre para dibujar</div>
+</div>
+
+<div id="chart">
+  <div id="legend"></div>
+  <div id="dropHint"><span>Soltar el CSV aquí para procesarlo</span></div>
+  <div id="overlay"><div class="spin"></div><p id="overlayMsg">Procesando…</p></div>
+  <canvas id="drawCanvas"></canvas>
+  <div class="zoomctl" id="zoomCtl">
+    <button id="zoomInBtn" title="Acercar (zoom in)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M11 8v6M8 11h6M21 21l-4.3-4.3"/></svg>
+    </button>
+    <button id="zoomOutBtn" title="Alejar (zoom out)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M21 21l-4.3-4.3"/></svg>
+    </button>
+    <button id="fitBtn" title="Ajustar a todo el rango">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V5a1 1 0 011-1h4M20 9V5a1 1 0 00-1-1h-4M4 15v4a1 1 0 001 1h4M20 15v4a1 1 0 01-1 1h-4"/></svg>
+    </button>
+  </div>
+</div>
+
+<footer>
+  <div id="footNote">Fuente: registro histórico propio (15 min) · limpieza: ceros y spikes &gt;25% filtrados · convención semanal: lunes</div>
+  <div class="k">rueda / botones = zoom · arrastrar = desplazar · doble clic = ajustar</div>
+</footer>
+
+<section class="tutorial">
+  <h2>TUTORIAL: RETROCESOS DE <span>FIBONACCI</span></h2>
+  <p class="lead">Guía breve para usar la herramienta "Fib" del gráfico de arriba.</p>
+
+  <div class="card">
+    <h3>1. De dónde salen los niveles</h3>
+    <p>La sucesión de Fibonacci es la serie donde cada número es la suma de los dos anteriores: 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144…</p>
+    <div class="formula">
+      F(n) = F(n-1) + F(n-2), &nbsp; con F(1)=F(2)=1
+    </div>
+    <p>Cuando dividís un número de la serie entre el siguiente, ese cociente converge al número áureo (φ ≈ 1,618) a medida que n crece:</p>
+    <div class="formula">
+      φ = lím(n→∞) F(n+1) / F(n) ≈ 1,618
+    </div>
+    <p>Los tres niveles de retroceso más usados salen de potencias inversas de φ — no son arbitrarios, son consecuencia directa de la propia sucesión:</p>
+    <div class="levels">
+      <span class="lvl"><b>61,8%</b> = 1/φ</span>
+      <span class="lvl"><b>38,2%</b> = 1/φ²</span>
+      <span class="lvl"><b>23,6%</b> = 1/φ³</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>2. Qué significa un "retroceso"</h3>
+    <p>Después de un movimiento fuerte (subida o bajada), el precio rara vez sigue en línea recta: retrocede una parte antes de continuar o de revertir del todo. La herramienta mide ese posible retroceso como porcentaje del movimiento previo — no predice el futuro, marca zonas donde históricamente el precio tiende a encontrar soporte o resistencia mientras digiere el movimiento.</p>
+  </div>
+
+  <div class="card">
+    <h3>3. Cómo trazarlo en este visor</h3>
+    <ol>
+      <li>Tocá el botón <b>Fib</b> en la barra de herramientas (el de las líneas horizontales).</li>
+      <li>Elegí un color de la paleta si querés diferenciarlo de otros trazos.</li>
+      <li>Tocá y arrastrá desde un extremo del movimiento (por ejemplo, un mínimo) hasta el otro extremo (un máximo), y soltá.</li>
+      <li>El visor dibuja automáticamente las líneas horizontales en 0%, 23,6%, 38,2%, 50%, 61,8%, 78,6% y 100%, con el precio exacto de cada nivel a la derecha.</li>
+      <li>La dirección en la que arrastrás define el sentido: 0% queda en el punto donde empezaste a arrastrar, 100% en el punto donde soltaste.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3>4. Ejemplo con los datos reales del gráfico</h3>
+    <p>Un caso claro para practicar con el boliviano: el techo del 15-may-2025 (≈18,90 Bs) y el valle del 28-ene-2026 (≈8,84 Bs). Trazá el Fib desde el techo hasta el valle y mirá si el rebote posterior se detuvo cerca de algún nivel (23,6% o 38,2% son los más comunes como "techo de rebote" dentro de una tendencia bajista dominante). Con las demás divisas el procedimiento es idéntico: identificá un swing (movimiento marcado entre un extremo y otro) y medí el retroceso.</p>
+    <p class="warn">Ojo: un nivel de Fibonacci por sí solo no es una señal de entrada. Combinalo con el análisis fundamental de cada país y con un patrón de velas que confirme el rebote en esa zona — el Fib te dice dónde mirar con más atención, no cuándo apretar el gatillo.</p>
+  </div>
+</section>
+
+<section class="calc">
+  <h2>CALCULADORA <span>CONVERSORA</span></h2>
+  <p class="lead">Convierte bolivianos ⇄ dólares ⇄ divisa extranjera, usando las cotizaciones reales de la fecha que elijas.</p>
+
+  <div class="box" id="calcStatusBox">
+    <h3>Estado de carga de datos</h3>
+    <p class="expl" style="margin-bottom:10px">La calculadora se activa recién cuando las cuatro divisas tienen su CSV cargado. Descargá cada archivo de su fuente y cargalo con el selector del visor de arriba.</p>
+    <div id="loadStatus"></div>
+  </div>
+
+  <div class="box" id="calcMainBox">
+    <div class="calcgrid">
+      <div class="field">
+        <label for="calcDate">Fecha de la cotización</label>
+        <input type="date" id="calcDate" min="2024-07-22">
+      </div>
+      <div class="field">
+        <label>Operación en bolivianos</label>
+        <div class="opgroup" id="calcOp">
+          <button data-op="buy" class="on">Compro USD</button>
+          <button data-op="sell">Vendo USD</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="calcAmount">Monto en dólares (USD)</label>
+        <input type="number" id="calcAmount" value="1000" min="0" step="any">
+      </div>
+      <div class="field">
+        <label for="calcTarget">Convertir además a</label>
+        <select id="calcTarget">
+          <option value="">— ninguna —</option>
+          <option value="pen">🇵🇪 Sol peruano (USD/PEN)</option>
+          <option value="clp">🇨🇱 Peso chileno (USD/CLP)</option>
+          <option value="arsb">🇦🇷 Peso argentino blue (USD/ARS)</option>
+        </select>
+      </div>
+    </div>
+    <button class="calcbtn" id="calcBtn" disabled>Calcular</button>
+
+    <div class="result" id="calcResult"></div>
+  </div>
+
+  <div class="box">
+    <h3>Fuentes de datos oficiales</h3>
+    <p class="expl">Descargá el histórico de cada divisa desde su página y cargá el CSV tal cual, sin editarlo:</p>
+    <div class="srclinks">
+      <a href="https://www.dolarbluebolivia.click/datos" target="_blank" rel="noopener">🇧🇴 USD/BOB — dolarbluebolivia.click</a>
+      <a href="https://mx.investing.com/currencies/usd-pen-historical-data" target="_blank" rel="noopener">🇵🇪 USD/PEN — Investing.com</a>
+      <a href="https://mx.investing.com/currencies/usd-clp-historical-data" target="_blank" rel="noopener">🇨🇱 USD/CLP — Investing.com</a>
+      <a href="https://mx.investing.com/currencies/usd-arsb-historical-data" target="_blank" rel="noopener">🇦🇷 USD/ARS blue — Investing.com</a>
+    </div>
+  </div>
+
+  <div class="box">
+    <h3>Cómo se calcula</h3>
+    <p class="expl">La operación usa el lado correcto del spread, igual que una casa de cambio real: si <b>comprás</b> dólares pagás el precio de <b>venta</b> del mercado; si <b>vendés</b> dólares recibís el precio de <b>compra</b>.</p>
+
+    <p class="expl">Comprando dólares (pagás bolivianos):</p>
+    <div class="formula">Bs entregados = USD × tasa_venta_blue</div>
+    <div class="formula">\text{Bs}_{\text{entregados}} = \text{USD} \times r_{\text{venta}}</div>
+
+    <p class="expl">Vendiendo dólares (recibís bolivianos):</p>
+    <div class="formula">Bs recibidos = USD × tasa_compra_blue</div>
+    <div class="formula">\text{Bs}_{\text{recibidos}} = \text{USD} \times r_{\text{compra}}</div>
+
+    <p class="expl">Y el paso a la divisa extranjera, dado que las tres se cotizan como unidades por dólar (USD/PEN, USD/CLP, USD/ARS):</p>
+    <div class="formula">Monto divisa = USD × tasa_cierre_del_día</div>
+    <div class="formula">M_{\text{divisa}} = \text{USD} \times r_{\text{cierre}}</div>
+
+    <p class="expl" style="color:var(--muted);font-size:12.5px;font-style:italic;margin-bottom:0">Si la fecha elegida cae en fin de semana o feriado, el cálculo usa la última cotización disponible previa y te avisa cuál fue. Cada divisa necesita su CSV cargado en el visor de arriba para poder usarse acá.</p>
+  </div>
+</section>
+
+<div id="toast"></div>
+
+<script>
+/* ====== Librería de gráficos (TradingView Lightweight Charts v4.1.3), embebida localmente ======
+   Se incrusta el código completo para que la página funcione sin depender de un CDN externo
+   (bloqueadores de anuncios, extensiones de privacidad o redes restringidas pueden impedir
+   la carga desde una URL externa, lo que causaba el error "LightweightCharts is not defined"). */
+</script>
+<script src="./lightweight-charts.js"></script>
+
+<script src="./bob_data.js"></script>
+<script>
+// ============================================================
+// Datos por defecto (ya procesados: 21-jul-2024 → hoy, velas horarias)
+// Formato de cada fila: [epoch, oB,hB,lB,cB, oS,hS,lS,cS, oficial]
+// ============================================================
+const DEFAULT_RAW = window.__BOB_DATA__ || [];
+
+// ============================================================
+// Configuración de divisas. Cada divisa define su modo de datos:
+//  - 'bob'  : filas de 10 campos [t, oB,hB,lB,cB, oS,hS,lS,cS, oficial]
+//             (doble serie compra/venta + línea oficial, cada 15 min)
+//  - 'ohlc' : filas de 5 campos [t, o,h,l,c] (una sola serie diaria)
+// El visor adapta la interfaz (compra/venta, línea oficial) según el modo.
+// ============================================================
+const CURRENCIES = {
+  bob:  {mode:'bob',  title:'DÓLAR BLUE · BOLIVIA', accent:'blue', pair:'Bs/USD',
+         hint:'Mercado paralelo · velas desde datos cada 15 min',
+         source:'registro histórico propio (15 min) · limpieza: ceros y spikes >25% filtrados',
+         raw: DEFAULT_RAW},
+  clp:  {mode:'ohlc', title:'PESO CHILENO · USD/CLP', accent:'clp', pair:'USD/CLP',
+         hint:'Cierre diario · formato Investing.com',
+         source:'Investing.com · cierre diario', raw:null},
+  pen:  {mode:'ohlc', title:'SOL PERUANO · USD/PEN', accent:'pen', pair:'USD/PEN',
+         hint:'Cierre diario · formato Investing.com',
+         source:'Investing.com · cierre diario', raw:null},
+  arsb: {mode:'ohlc', title:'PESO ARGENTINO BLUE · USD/ARS', accent:'arsb', pair:'USD/ARS blue',
+         hint:'Cierre diario · formato Investing.com',
+         source:'Investing.com · cierre diario', raw:null},
+};
+
+let curKey = 'bob';
+let RAW = DEFAULT_RAW;
+let currentLabel = "dataset original (" + DEFAULT_RAW.length.toLocaleString('es-BO') + " velas horarias)";
+function curMode(){ return CURRENCIES[curKey].mode; }
+
+// ---------- Agregación a distintos marcos temporales ----------
+function bucketKey(t, tf){
+  const d = new Date(t*1000);
+  switch(tf){
+    case '1h': return t;
+    case '5h': return Math.floor(t/18000)*18000;
+    case '1d': return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())/1000;
+    case '1w': {
+      const day = d.getUTCDay();
+      const diff = (day === 0 ? 6 : day-1);
+      return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()-diff)/1000;
+    }
+    case '1M': return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)/1000;
+  }
+}
+function aggregate(tf, serie){
+  const candles=[], offLine=[];
+  const mode = curMode();
+  let cur=null;
+  for(const r of RAW){
+    let o,h,l,c,off;
+    if(mode==='bob'){
+      const iO = serie==='buy'?1:5;
+      o=r[iO]; h=r[iO+1]; l=r[iO+2]; c=r[iO+3]; off=r[9];
+    } else { // ohlc: [t,o,h,l,c]
+      o=r[1]; h=r[2]; l=r[3]; c=r[4]; off=null;
+    }
+    const k = bucketKey(r[0], tf);
+    if(!cur || cur.time!==k){
+      if(cur){candles.push(cur.c); if(cur.off) offLine.push(cur.off);}
+      cur={time:k, c:{time:k, open:o, high:h, low:l, close:c}, off: off===null?null:{time:k, value:off}};
+    }else{
+      cur.c.high = Math.max(cur.c.high, h);
+      cur.c.low  = Math.min(cur.c.low,  l);
+      cur.c.close= c;
+      if(cur.off) cur.off.value = off;
+    }
+  }
+  if(cur){candles.push(cur.c); if(cur.off) offLine.push(cur.off);}
+  return {candles, offLine};
+}
+
+// ---------- Chart ----------
+const el = document.getElementById('chart');
+const chart = LightweightCharts.createChart(el, {
+  layout:{background:{type:'solid', color:'#0E1420'}, textColor:'#7C8AA5',
+          fontFamily:"'IBM Plex Mono',monospace", fontSize:11},
+  grid:{vertLines:{color:'#1A2336'}, horzLines:{color:'#1A2336'}},
+  rightPriceScale:{borderColor:'#223047'},
+  timeScale:{borderColor:'#223047', timeVisible:true, secondsVisible:false},
+  crosshair:{mode:LightweightCharts.CrosshairMode.Normal,
+    vertLine:{color:'#7C8AA5', width:1, style:2, labelBackgroundColor:'#1B2438'},
+    horzLine:{color:'#7C8AA5', width:1, style:2, labelBackgroundColor:'#1B2438'}},
+  localization:{locale:'es-BO', priceFormatter:p=>p.toFixed(2)}
+});
+const candleSeries = chart.addCandlestickSeries({
+  upColor:'#2FBF71', downColor:'#E4574C', borderVisible:false,
+  wickUpColor:'#2FBF71', wickDownColor:'#E4574C',
+  priceFormat:{type:'price', precision:2, minMove:0.01}
+});
+const offSeries = chart.addLineSeries({
+  color:'#F2A93B', lineWidth:1, lineStyle:LightweightCharts.LineStyle.Dashed,
+  priceLineVisible:false, lastValueVisible:true, crosshairMarkerVisible:false,
+  priceFormat:{type:'price', precision:2, minMove:0.01}
+});
+const smaSeries = chart.addLineSeries({
+  color:'#5AC8FA', lineWidth:1.5, priceLineVisible:false, lastValueVisible:false,
+  crosshairMarkerVisible:false, priceFormat:{type:'price', precision:2, minMove:0.01}
+});
+const emaSeries = chart.addLineSeries({
+  color:'#C77DFF', lineWidth:1.5, priceLineVisible:false, lastValueVisible:false,
+  crosshairMarkerVisible:false, priceFormat:{type:'price', precision:2, minMove:0.01}
+});
+
+// ---------- Medias móviles: SMA (simple) y EMA (exponencial) ----------
+function computeSMA(candles, period){
+  const out=[]; let sum=0;
+  for(let i=0;i<candles.length;i++){
+    sum += candles[i].close;
+    if(i>=period) sum -= candles[i-period].close;
+    if(i>=period-1) out.push({time:candles[i].time, value: sum/period});
+  }
+  return out;
+}
+function computeEMA(candles, period){
+  const out=[]; const k = 2/(period+1); let prev=null;
+  for(let i=0;i<candles.length;i++){
+    if(i<period-1) continue;
+    if(prev===null){
+      let sum=0; for(let j=i-period+1;j<=i;j++) sum+=candles[j].close;
+      prev = sum/period;
+    } else {
+      prev = candles[i].close*k + prev*(1-k);
+    }
+    out.push({time:candles[i].time, value: prev});
+  }
+  return out;
+}
+
+let tf='1d', serie='sell', showOff=true;
+let showSMA=false, smaPeriod=20, showEMA=false, emaPeriod=12;
+
+// Precisión dinámica: el ARS blue ronda los miles, el resto está entre 1 y 20.
+function pricePrecision(){
+  const last = RAW && RAW.length ? RAW[RAW.length-1] : null;
+  const v = !last ? 10 : (curMode()==='bob' ? last[8] : last[4]);
+  if(v>=1000) return 0;
+  if(v>=100) return 1;
+  return 2;
+}
+function applyPrecision(){
+  const prec = pricePrecision();
+  const minMove = prec===0 ? 1 : (prec===1 ? 0.1 : 0.01);
+  const pf = {type:'price', precision:prec, minMove:minMove};
+  candleSeries.applyOptions({priceFormat:pf});
+  offSeries.applyOptions({priceFormat:pf});
+  smaSeries.applyOptions({priceFormat:pf});
+  emaSeries.applyOptions({priceFormat:pf});
+  chart.applyOptions({localization:{locale:'es-BO', priceFormatter:p=>p.toFixed(prec)}});
+  return prec;
+}
+
+function render(fit){
+  const {candles, offLine} = aggregate(tf, serie);
+  candleSeries.setData(candles);
+  offSeries.setData((showOff && curMode()==='bob') ? offLine : []);
+  smaSeries.setData(showSMA ? computeSMA(candles, smaPeriod) : []);
+  emaSeries.setData(showEMA ? computeEMA(candles, emaPeriod) : []);
+  document.getElementById('candCount').textContent = candles.length.toLocaleString('es-BO') + ' velas · ' + label(tf);
+  if(fit) chart.timeScale().fitContent();
+  updateStats();
+}
+function label(tf){return {'1h':'1 hora','5h':'5 horas','1d':'diario','1w':'semanal','1M':'mensual'}[tf];}
+
+// ---------- Adaptar la interfaz a la divisa activa ----------
+function applyCurrencyUI(){
+  const cfg = CURRENCIES[curKey];
+  const isBob = cfg.mode==='bob';
+  // marcos sub-diarios solo tienen sentido para el boliviano (15 min)
+  document.querySelectorAll('#tfGroup button[data-tf="1h"],#tfGroup button[data-tf="5h"]').forEach(b=>{
+    b.style.display = isBob ? '' : 'none';
+  });
+  // si estamos en un marco sub-diario y cambiamos a una divisa diaria, saltar a 1d
+  if(!isBob && (tf==='1h'||tf==='5h')){
+    tf='1d';
+    document.querySelectorAll('#tfGroup button').forEach(x=>x.classList.toggle('on', x.dataset.tf==='1d'));
+  }
+  // compra/venta y línea oficial: solo boliviano
+  document.getElementById('serieGroup').style.display = isBob ? '' : 'none';
+  document.getElementById('offChk').style.display = isBob ? '' : 'none';
+  document.getElementById('statBuy').style.display = isBob ? '' : 'none';
+  document.getElementById('statOff').style.display = isBob ? '' : 'none';
+  document.getElementById('statGap').style.display = isBob ? '' : 'none';
+  document.getElementById('lbl1').textContent = isBob ? 'Blue venta' : 'Último cierre';
+  // título y textos
+  const [name, pairLabel] = cfg.title.split(' · ');
+  document.getElementById('pageTitle').innerHTML =
+    name.replace(/(\w+)$/, '<span>$1</span>');
+  document.getElementById('loadHint').textContent = cfg.hint;
+  applyPrecision();
+}
+
+// ---------- Controles de marco temporal / serie ----------
+document.getElementById('tfGroup').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#tfGroup button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); tf=b.dataset.tf; render(true);
+});
+document.getElementById('serieGroup').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#serieGroup button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); serie=b.dataset.s; render(false);
+});
+document.getElementById('offToggle').addEventListener('change', e=>{
+  showOff=e.target.checked; render(false);
+});
+document.getElementById('smaToggle').addEventListener('change', e=>{ showSMA=e.target.checked; render(false); });
+document.getElementById('smaPeriod').addEventListener('change', e=>{
+  smaPeriod=Math.max(2, parseInt(e.target.value)||20); e.target.value=smaPeriod; render(false);
+});
+document.getElementById('emaToggle').addEventListener('change', e=>{ showEMA=e.target.checked; render(false); });
+document.getElementById('emaPeriod').addEventListener('change', e=>{
+  emaPeriod=Math.max(2, parseInt(e.target.value)||12); e.target.value=emaPeriod; render(false);
+});
+el.addEventListener('dblclick', ()=>chart.timeScale().fitContent());
+
+// ---------- Zoom ----------
+function zoomBy(factor){
+  const ts = chart.timeScale();
+  const range = ts.getVisibleLogicalRange();
+  if(!range) return;
+  const center = (range.from + range.to)/2;
+  const half = (range.to - range.from)/2 * factor;
+  ts.setVisibleLogicalRange({from: center-half, to: center+half});
+}
+document.getElementById('zoomInBtn').addEventListener('click', ()=>zoomBy(0.7));
+document.getElementById('zoomOutBtn').addEventListener('click', ()=>zoomBy(1/0.7));
+document.getElementById('fitBtn').addEventListener('click', ()=>chart.timeScale().fitContent());
+
+// ---------- Leyenda OHLC ----------
+const legend=document.getElementById('legend');
+const fmtDate=t=>{
+  const d=new Date(t*1000);
+  const opts = (tf==='1h'||tf==='5h') ? {day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'UTC'}
+                                      : {day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'};
+  return d.toLocaleString('es-BO', opts);
+};
+chart.subscribeCrosshairMove(p=>{
+  const d = p.seriesData && p.seriesData.get(candleSeries);
+  if(!p.time || !d){legend.style.display='none'; return;}
+  const off = p.seriesData.get(offSeries);
+  const sma = p.seriesData.get(smaSeries);
+  const ema = p.seriesData.get(emaSeries);
+  const prec = pricePrecision();
+  const isBob = curMode()==='bob';
+  const dir = d.close>=d.open ? '#2FBF71' : '#E4574C';
+  legend.style.display='block';
+  legend.innerHTML = '<b>'+fmtDate(p.time)+'</b><br>'+
+    '<span class="o">A</span> '+d.open.toFixed(prec)+' <span class="o">M</span> '+d.high.toFixed(prec)+
+    ' <span class="o">m</span> '+d.low.toFixed(prec)+' <span class="o">C</span> <b style="color:'+dir+'">'+d.close.toFixed(prec)+'</b>'+
+    (off&&showOff&&isBob ? '<br><span style="color:#F2A93B">Oficial '+off.value.toFixed(prec)+'</span>' : '') +
+    (sma&&showSMA ? '<br><span style="color:#5AC8FA">SMA'+smaPeriod+' '+sma.value.toFixed(prec)+'</span>' : '') +
+    (ema&&showEMA ? '<br><span style="color:#C77DFF">EMA'+emaPeriod+' '+ema.value.toFixed(prec)+'</span>' : '');
+});
+
+// ---------- Stats de cabecera (se recalculan según el dataset activo) ----------
+function updateStats(){
+  const cfg=CURRENCIES[curKey];
+  const isBob=cfg.mode==='bob';
+  const prec=pricePrecision();
+  const last=RAW[RAW.length-1];
+  const lastClose = isBob ? last[8] : last[4];
+  const lastDay = bucketKey(last[0],'1d');
+  let prevClose=null;
+  for(let i=RAW.length-1;i>=0;i--){
+    if(bucketKey(RAW[i][0],'1d')!==lastDay){ prevClose = isBob?RAW[i][8]:RAW[i][4]; break; }
+  }
+  // El "último cierre" se muestra con 4 decimales para dar más resolución al dato puntual
+  document.getElementById('sSell').textContent = lastClose.toFixed(isBob ? prec : 4);
+  const chEl=document.getElementById('sSellCh');
+  if(prevClose){
+    const ch=(lastClose/prevClose-1)*100;
+    chEl.textContent=(ch>=0?'+':'')+ch.toFixed(2)+'% vs. día previo';
+    chEl.style.color = ch>=0 ? '#2FBF71' : '#E4574C';
+  } else { chEl.textContent='—'; }
+  if(isBob){
+    document.getElementById('sBuy').textContent = last[4].toFixed(prec);
+    document.getElementById('sOff').textContent = last[9].toFixed(prec);
+    const gap=(last[8]/last[9]-1)*100;
+    document.getElementById('sGap').textContent=(gap>=0?'+':'')+gap.toFixed(1)+'%';
+  }
+
+  const first=RAW[0];
+  const d0=new Date(first[0]*1000), d1=new Date(last[0]*1000);
+  const f=d=>d.toLocaleDateString('es-BO',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});
+  document.getElementById('subtitle').textContent =
+    cfg.pair+' · '+f(d0)+' → '+f(d1)+' · '+currentLabel;
+}
+
+// ============================================================
+// Herramientas de dibujo manual sobre el gráfico (línea recta / libre)
+// Los trazos se guardan como puntos {time, price} —no en píxeles—
+// para que sigan alineados con las velas al hacer pan, zoom o resize.
+// ============================================================
+const drawCanvas = document.getElementById('drawCanvas');
+const dctx = drawCanvas.getContext('2d');
+let drawTool = 'cursor';
+let drawColor = '#FFFFFF';
+let drawWidth = 1.5;
+let shapes = [];
+let currentShape = null;
+let isDrawing = false;
+
+function resizeDrawCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  drawCanvas.width = Math.max(1, el.clientWidth * dpr);
+  drawCanvas.height = Math.max(1, el.clientHeight * dpr);
+  drawCanvas.style.width = el.clientWidth + 'px';
+  drawCanvas.style.height = el.clientHeight + 'px';
+}
+
+function timeToX(t){ return chart.timeScale().timeToCoordinate(t); }
+function priceToY(p){ return candleSeries.priceToCoordinate(p); }
+function xToTime(x){ return chart.timeScale().coordinateToTime(x); }
+function yToPrice(y){ return candleSeries.coordinateToPrice(y); }
+
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+function redrawShapes(){
+  const dpr = window.devicePixelRatio || 1;
+  dctx.save();
+  dctx.setTransform(dpr,0,0,dpr,0,0);
+  dctx.clearRect(0,0,el.clientWidth,el.clientHeight);
+  const all = currentShape ? shapes.concat([currentShape]) : shapes;
+  for(const s of all){
+    if(s.type==='fib'){ drawFib(s); continue; }
+    dctx.strokeStyle = s.color;
+    dctx.lineWidth = s.width;
+    dctx.lineJoin = 'round'; dctx.lineCap = 'round';
+    dctx.beginPath();
+    let started=false;
+    for(const p of s.pts){
+      const x = timeToX(p.time), y = priceToY(p.price);
+      if(x===null||y===null) continue;
+      if(!started){ dctx.moveTo(x,y); started=true; } else dctx.lineTo(x,y);
+    }
+    if(started) dctx.stroke();
+  }
+  dctx.restore();
+}
+function drawFib(s){
+  const p0=s.pts[0], p1=s.pts[1];
+  const x0=timeToX(p0.time), x1=timeToX(p1.time);
+  const y0=priceToY(p0.price), y1=priceToY(p1.price);
+  if(x0===null||x1===null||y0===null||y1===null) return;
+  const xLeft=Math.min(x0,x1), xRight=Math.max(x0,x1);
+  // diagonal tenue que conecta los dos anclajes
+  dctx.strokeStyle=s.color; dctx.globalAlpha=0.3; dctx.lineWidth=1; dctx.setLineDash([]);
+  dctx.beginPath(); dctx.moveTo(x0,y0); dctx.lineTo(x1,y1); dctx.stroke();
+  dctx.font = "11px 'IBM Plex Mono', monospace";
+  dctx.textBaseline = 'middle';
+  for(const lvl of FIB_LEVELS){
+    const price = p0.price + (p1.price - p0.price) * lvl;
+    const y = priceToY(price);
+    if(y===null) continue;
+    const isEdge = lvl===0 || lvl===1;
+    dctx.globalAlpha = isEdge ? 0.9 : 0.55;
+    dctx.lineWidth = isEdge ? s.width : Math.max(1, s.width-0.5);
+    dctx.setLineDash(isEdge ? [] : [5,4]);
+    dctx.strokeStyle = s.color;
+    dctx.beginPath(); dctx.moveTo(xLeft,y); dctx.lineTo(xRight,y); dctx.stroke();
+    dctx.setLineDash([]);
+    dctx.globalAlpha = 0.95;
+    dctx.fillStyle = s.color;
+    dctx.fillText((lvl*100).toFixed(1)+'%  '+price.toFixed(2), xRight+6, y);
+  }
+  dctx.globalAlpha = 1;
+}
+// Redibuja en cada frame: cubre pan, zoom (tiempo y precio) y cambios de escala sin
+// tener que engancharse a cada evento distinto que expone la librería del gráfico.
+(function loop(){ redrawShapes(); requestAnimationFrame(loop); })();
+
+function setDrawTool(t){
+  drawTool = t;
+  document.querySelectorAll('#drawToolGroup button').forEach(b=>b.classList.toggle('on', b.dataset.tool===t));
+  drawCanvas.style.pointerEvents = (t==='cursor') ? 'none' : 'auto';
+  drawCanvas.style.cursor = (t==='cursor') ? 'default' : 'crosshair';
+  const hint = document.getElementById('drawHintText');
+  hint.textContent = t==='cursor' ? 'cursor activo · elegí una herramienta para dibujar'
+                    : t==='line'  ? 'línea recta · tocá y arrastrá, soltá para fijar'
+                    : t==='fib'   ? 'fibonacci · arrastrá desde un extremo del movimiento hasta el otro'
+                                  : 'dibujo libre · tocá y arrastrá para trazar';
+}
+document.getElementById('drawToolGroup').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  setDrawTool(b.dataset.tool);
+});
+
+document.getElementById('palette').addEventListener('click', e=>{
+  const b=e.target.closest('.swatch'); if(!b) return;
+  document.querySelectorAll('.swatch').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); drawColor = b.dataset.color;
+});
+document.getElementById('widthGroup').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#widthGroup button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); drawWidth = parseFloat(b.dataset.w);
+});
+document.getElementById('undoBtn').addEventListener('click', ()=>{ shapes.pop(); });
+document.getElementById('clearDrawBtn').addEventListener('click', ()=>{ shapes = []; });
+
+function pointFromEvent(e){
+  const rect = drawCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  const time = xToTime(x), price = yToPrice(y);
+  return (time===null || price===null) ? null : {time, price};
+}
+drawCanvas.addEventListener('pointerdown', e=>{
+  if(drawTool==='cursor') return;
+  const pt = pointFromEvent(e); if(!pt) return;
+  isDrawing = true;
+  drawCanvas.setPointerCapture(e.pointerId);
+  currentShape = (drawTool==='line' || drawTool==='fib')
+    ? {type:drawTool, color:drawColor, width:drawWidth, pts:[pt, {...pt}]}
+    : {type:'free', color:drawColor, width:drawWidth, pts:[pt]};
+});
+drawCanvas.addEventListener('pointermove', e=>{
+  if(!isDrawing || !currentShape) return;
+  const pt = pointFromEvent(e); if(!pt) return;
+  if(currentShape.type==='line' || currentShape.type==='fib') currentShape.pts[1] = pt;
+  else currentShape.pts.push(pt);
+});
+function finishStroke(){
+  if(!isDrawing) return;
+  isDrawing = false;
+  if(currentShape && currentShape.pts.length>=2) shapes.push(currentShape);
+  currentShape = null;
+}
+drawCanvas.addEventListener('pointerup', finishStroke);
+drawCanvas.addEventListener('pointercancel', finishStroke);
+drawCanvas.addEventListener('pointerleave', e=>{ if(e.buttons===0) finishStroke(); });
+
+// ---------- Responsive ----------
+new ResizeObserver(()=>{
+  chart.applyOptions({width:el.clientWidth, height:el.clientHeight});
+  resizeDrawCanvas();
+}).observe(el);
+resizeDrawCanvas();
+render(true);
+
+// ============================================================
+// Carga y procesamiento de CSV — dos formatos soportados:
+//  (A) Boliviano paralelo: "datetime,official_buy,official_sell,blue_buy,blue_sell"
+//      cada 15 min → se agrupa a velas horarias, doble serie + oficial.
+//  (B) Investing.com: "Fecha,Último,Apertura,Máximo,Mínimo,Vol.,% var."
+//      diario, formato latino (coma decimal, punto de miles) → OHLC simple.
+// El formato se detecta por el encabezado. La divisa activa fija el modo esperado.
+// ============================================================
+const overlay=document.getElementById('overlay');
+const overlayMsg=document.getElementById('overlayMsg');
+const toast=document.getElementById('toast');
+function showToast(msg, isErr){
+  toast.textContent=msg;
+  toast.className = isErr ? 'on err' : 'on';
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=>toast.classList.remove('on'), 4600);
+}
+
+// ---- Detección de formato por encabezado ----
+function detectFormat(text){
+  const first = stripBOM(text.split(/\r?\n/)[0]||'').toLowerCase();
+  if(first.includes('datetime') && first.includes('blue_sell')) return 'bob';
+  if(first.includes('fecha') && (first.includes('cierre')||first.includes('último')||first.includes('ultimo'))) return 'investing';
+  return null;
+}
+
+// ---- Número en formato configurable (auto-detecta coma o punto decimal) ----
+// Investing.com exporta a veces con coma decimal (1.234,56) y a veces con
+// punto decimal (1,234.56 o 948.90). Se detecta a nivel de archivo para
+// evitar la ambigüedad entre separador decimal y de miles.
+function detectDecimalSep(sampleValues){
+  let commaDec=0, dotDec=0;
+  for(const v of sampleValues){
+    const s=String(v==null?'':v).replace(/"/g,'').trim();
+    if(/,\d{1,2}$/.test(s)) commaDec++;
+    else if(/\.\d{1,2}$/.test(s)) dotDec++;
+  }
+  return (commaDec>=dotDec && commaDec>0) ? ',' : '.';
+}
+function makeNumberParser(decSep){
+  const thouSep = decSep===',' ? '.' : ',';
+  return function(s){
+    if(s==null) return NaN;
+    s=String(s).trim().replace(/"/g,'');
+    if(!s || s==='-' || s.toLowerCase()==='n/d') return NaN;
+    s=s.split(thouSep).join('').replace(decSep,'.');
+    const v=parseFloat(s);
+    return isFinite(v)?v:NaN;
+  };
+}
+function stripBOM(text){
+  return (text && text.charCodeAt(0)===0xFEFF) ? text.slice(1) : text;
+}
+
+// ---- Divide una línea CSV respetando comillas ----
+function splitCSVLine(line){
+  const out=[]; let cur=''; let q=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='"'){ q=!q; continue; }
+    if(ch===',' && !q){ out.push(cur); cur=''; continue; }
+    cur+=ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+// ================= Formato A: boliviano 15 min =================
+function parseBob(text){
+  const lines = stripBOM(text).split(/\r?\n/);
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const line=lines[i]; if(!line) continue;
+    const p=line.split(','); if(p.length<5) continue;
+    const dt=p[0];
+    const y=+dt.slice(0,4), mo=+dt.slice(5,7)-1, da=+dt.slice(8,10),
+          h=+dt.slice(11,13), mi=+dt.slice(14,16), s=+dt.slice(17,19);
+    const t = Date.UTC(y,mo,da,h,mi,s)/1000;
+    if(!isFinite(t)) continue;
+    const ob=parseFloat(p[1]), os=parseFloat(p[2]), bb=parseFloat(p[3]), bs=parseFloat(p[4]);
+    if(!isFinite(ob)||!isFinite(os)||!isFinite(bb)||!isFinite(bs)) continue;
+    rows.push({t, ob, os, bb, bs});
+  }
+  rows.sort((a,b)=>a.t-b.t);
+  return rows;
+}
+function despike(rows, key, thresh=0.25, win=48){
+  const n=rows.length; const vals=rows.map(r=>r[key]); const out=vals.slice();
+  for(let i=0;i<n;i++){
+    const lo=Math.max(0,i-win), hi=Math.min(n,i+win+1); const w=[];
+    for(let j=lo;j<hi;j++){ if(j!==i && isFinite(vals[j])) w.push(vals[j]); }
+    if(w.length<10) continue;
+    w.sort((a,b)=>a-b);
+    const med = w.length%2 ? w[(w.length-1)/2] : (w[w.length/2-1]+w[w.length/2])/2;
+    if(med>0 && Math.abs(vals[i]/med-1)>thresh) out[i]=NaN;
+  }
+  let last=null;
+  for(let i=0;i<n;i++){ if(isFinite(out[i])) last=out[i]; else if(last!==null) out[i]=last; }
+  for(let i=0;i<n;i++) rows[i][key]=out[i];
+  return rows;
+}
+function toHourlyRaw(rows){
+  const buckets=new Map();
+  for(const r of rows){
+    const d=new Date(r.t*1000);
+    const hk=Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours())/1000;
+    let b=buckets.get(hk);
+    if(!b){ b={oB:r.bb,hB:r.bb,lB:r.bb,cB:r.bb, oS:r.bs,hS:r.bs,lS:r.bs,cS:r.bs, off:r.os}; buckets.set(hk,b); }
+    else{
+      b.hB=Math.max(b.hB,r.bb); b.lB=Math.min(b.lB,r.bb); b.cB=r.bb;
+      b.hS=Math.max(b.hS,r.bs); b.lS=Math.min(b.lS,r.bs); b.cS=r.bs; b.off=r.os;
+    }
+  }
+  const keys=[...buckets.keys()].sort((a,b)=>a-b);
+  const round=x=>Math.round(x*100)/100;
+  return keys.map(k=>{ const b=buckets.get(k);
+    return [k, round(b.oB),round(b.hB),round(b.lB),round(b.cB),
+                round(b.oS),round(b.hS),round(b.lS),round(b.cS), round(b.off)]; });
+}
+
+// ================= Formato B: Investing.com OHLC diario =================
+// "Fecha,Cierre|Último,Apertura,Máximo,Mínimo,Vol.,% var."
+// Fecha en dd.mm.yyyy | dd/mm/yyyy | yyyy-mm-dd. Devuelve filas [t, o,h,l,c].
+function parseInvesting(text){
+  text = stripBOM(text);
+  const lines=text.split(/\r?\n/);
+  const header=splitCSVLine(lines[0]).map(s=>s.trim().toLowerCase().replace(/"/g,''));
+  const idx=(names)=>{ for(const n of names){ const k=header.findIndex(h=>h===n||h.includes(n)); if(k>=0) return k; } return -1; };
+  const iF=idx(['fecha']), iC=idx(['cierre','último','ultimo']), iO=idx(['apertura']),
+        iH=idx(['máximo','maximo']), iL=idx(['mínimo','minimo']);
+  if(iF<0||iC<0||iO<0||iH<0||iL<0) throw new Error('encabezado Investing.com no reconocido (se esperan columnas Fecha, Cierre/Último, Apertura, Máximo, Mínimo)');
+  // Muestrear valores de cierre para detectar el separador decimal del archivo
+  const sample=[];
+  for(let i=1;i<lines.length && sample.length<40;i++){
+    if(!lines[i].trim()) continue;
+    const p=splitCSVLine(lines[i]);
+    if(p[iC]!=null) sample.push(p[iC]);
+  }
+  const num = makeNumberParser(detectDecimalSep(sample));
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const line=lines[i]; if(!line.trim()) continue;
+    const p=splitCSVLine(line);
+    const df=(p[iF]||'').trim().replace(/"/g,'');
+    let y,mo,da,m;
+    m=df.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/);
+    if(m){ da=+m[1]; mo=+m[2]-1; y=+m[3]; }
+    else{ m=df.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m){ y=+m[1]; mo=+m[2]-1; da=+m[3]; } else continue; }
+    const t=Date.UTC(y,mo,da)/1000;
+    const c=num(p[iC]), o=num(p[iO]), h=num(p[iH]), l=num(p[iL]);
+    if(![t,o,h,l,c].every(isFinite)) continue;
+    rows.push([t, o, h, l, c]);
+  }
+  rows.sort((a,b)=>a[0]-b[0]);
+  return rows;
+}
+
+// ---- Router de procesamiento ----
+function processCSVText(text, filename){
+  overlay.classList.add('on'); overlayMsg.textContent='Leyendo archivo…';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    try{
+      const fmt = detectFormat(text);
+      const expected = curMode(); // 'bob' o 'ohlc'
+      if(fmt==='bob' && expected!=='bob')
+        throw new Error('Ese archivo es del boliviano (15 min). Seleccioná "Bs blue" antes de cargarlo.');
+      if(fmt==='investing' && expected!=='ohlc')
+        throw new Error('Ese archivo es diario (Investing.com). Seleccioná una divisa distinta al boliviano.');
+      if(!fmt)
+        throw new Error('Formato de CSV no reconocido. Esperado: boliviano (datetime,...) o Investing.com (Fecha,Último,...).');
+
+      let newRaw, summary;
+      if(fmt==='bob'){
+        let rows=parseBob(text);
+        if(rows.length<10) throw new Error('Pocas filas válidas para el formato boliviano.');
+        const before=rows.length;
+        rows=rows.filter(r=>r.bb>=5 && r.bs>=5);
+        overlayMsg.textContent='Corrigiendo picos aislados…';
+        rows=despike(rows,'bb'); rows=despike(rows,'bs');
+        overlayMsg.textContent='Agrupando en velas horarias…';
+        newRaw=toHourlyRaw(rows);
+        summary=before.toLocaleString('es-BO')+' registros → '+newRaw.length.toLocaleString('es-BO')+' velas horarias';
+      } else {
+        overlayMsg.textContent='Procesando velas diarias…';
+        newRaw=parseInvesting(text);
+        if(newRaw.length<5) throw new Error('Pocas filas válidas para el formato Investing.com.');
+        summary=newRaw.length.toLocaleString('es-BO')+' velas diarias';
+      }
+      if(newRaw.length===0) throw new Error('No se generaron velas a partir del archivo.');
+
+      CURRENCIES[curKey].raw = newRaw;
+      RAW = newRaw;
+      // si se recargó el boliviano, actualizar el rango de fechas de la calculadora
+      if(curKey==='bob'){
+        const inp=document.getElementById('calcDate');
+        if(inp){
+          const lastISO=new Date(newRaw[newRaw.length-1][0]*1000).toISOString().slice(0,10);
+          inp.max=lastISO;
+          if(!inp.value || inp.value>lastISO) inp.value=lastISO;
+        }
+      }
+      currentLabel = (filename||'CSV cargado')+' · '+summary;
+      document.getElementById('footNote').textContent =
+        'Fuente: '+(filename||'archivo cargado')+' · '+CURRENCIES[curKey].source+' · procesado en el navegador';
+      applyCurrencyUI();
+      render(true);
+      refreshCalcStatus();
+      showToast('Listo: '+summary+'.');
+    }catch(err){
+      showToast('Error al procesar el CSV: '+err.message, true);
+    }finally{
+      overlay.classList.remove('on');
+    }
+  }));
+}
+
+// ---- Selector de divisa ----
+document.getElementById('curGroup').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#curGroup button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  curKey=b.dataset.cur;
+  const cfg=CURRENCIES[curKey];
+  applyCurrencyUI();
+  if(cfg.raw){
+    RAW=cfg.raw;
+    currentLabel = curKey==='bob' && cfg.raw===DEFAULT_RAW
+      ? 'dataset original ('+DEFAULT_RAW.length.toLocaleString('es-BO')+' velas horarias)'
+      : currentLabel;
+    document.getElementById('footNote').textContent = 'Fuente: '+cfg.source+' · procesado en el navegador';
+    render(true);
+  } else {
+    // sin datos aún para esta divisa: limpiar gráfico e invitar a cargar
+    candleSeries.setData([]); offSeries.setData([]); smaSeries.setData([]); emaSeries.setData([]);
+    document.getElementById('candCount').textContent='';
+    document.getElementById('sSell').textContent='—';
+    document.getElementById('subtitle').textContent=cfg.pair+' · cargá el CSV de esta divisa para verla';
+    document.getElementById('footNote').textContent='Fuente: '+cfg.source+' · aún no cargado';
+    showToast('Cargá el CSV de '+cfg.pair+' con el botón "Cargar CSV".');
+  }
+});
+
+document.getElementById('loadBtn').addEventListener('click', ()=>document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change', e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=ev=>processCSVText(ev.target.result, f.name);
+  reader.onerror=()=>showToast('No se pudo leer el archivo.', true);
+  reader.readAsText(f);
+  e.target.value='';
+});
+document.getElementById('clearAllBtn').addEventListener('click', ()=>chart.timeScale().fitContent());
+
+// Arrastrar y soltar el CSV sobre el gráfico
+const dropHint=document.getElementById('dropHint');
+['dragenter','dragover'].forEach(ev=>el.addEventListener(ev, e=>{e.preventDefault(); dropHint.classList.add('on');}));
+['dragleave','drop'].forEach(ev=>el.addEventListener(ev, e=>{e.preventDefault(); if(ev==='drop'||e.target===el) dropHint.classList.remove('on');}));
+el.addEventListener('drop', e=>{
+  const f=e.dataTransfer.files[0]; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=ev=>processCSVText(ev.target.result, f.name);
+  reader.readAsText(f);
+});
+
+// ============================================================
+// Calculadora conversora: Bs ⇄ USD ⇄ divisa extranjera, por fecha
+// Lee directamente de CURRENCIES[...].raw, así que funciona con
+// cualquier CSV que hayas cargado en el visor de arriba.
+// ============================================================
+function dayKeyOf(t){
+  const d=new Date(t*1000);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())/1000;
+}
+// Última fila con fecha <= dayEpoch (cubre fines de semana y feriados)
+function lookupBOB(dayEpoch){
+  const raw=CURRENCIES.bob.raw;
+  if(!raw||!raw.length) return null;
+  for(let i=raw.length-1;i>=0;i--){
+    if(dayKeyOf(raw[i][0])<=dayEpoch){
+      const r=raw[i];
+      return {buy:r[4], sell:r[8], off:r[9], t:dayKeyOf(r[0])};
+    }
+  }
+  return null;
+}
+function lookupOHLC(key, dayEpoch){
+  const raw=CURRENCIES[key].raw;
+  if(!raw||!raw.length) return null;
+  for(let i=raw.length-1;i>=0;i--){
+    if(raw[i][0]<=dayEpoch) return {close:raw[i][4], t:raw[i][0]};
+  }
+  return null;
+}
+const fmtDay = t => new Date(t*1000).toLocaleDateString('es-BO',
+  {day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});
+const fmtNum = (v,dec) => v.toLocaleString('es-BO',{minimumFractionDigits:dec, maximumFractionDigits:dec});
+
+let calcOp='buy';
+document.getElementById('calcOp').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#calcOp button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); calcOp=b.dataset.op;
+});
+
+// ---- Estado de carga: la calculadora espera ("Hold") a las 4 divisas ----
+const CALC_ORDER=[['bob','🇧🇴 USD/BOB'],['pen','🇵🇪 USD/PEN'],['clp','🇨🇱 USD/CLP'],['arsb','🇦🇷 USD/ARS blue']];
+function refreshCalcStatus(){
+  const cont=document.getElementById('loadStatus');
+  let allLoaded=true, html='';
+  for(const [key,name] of CALC_ORDER){
+    const raw=CURRENCIES[key].raw;
+    const loaded = raw && raw.length>0;
+    if(!loaded) allLoaded=false;
+    let range='';
+    if(loaded){
+      const tIdx = 0;
+      const t0=raw[0][tIdx], t1=raw[raw.length-1][tIdx];
+      range=fmtDay(t0)+' → '+fmtDay(t1)+' · '+raw.length.toLocaleString('es-BO')+' filas';
+    }
+    html+='<div class="statusrow">'+
+      '<span class="pill '+(loaded?'ok':'no')+'">'+(loaded?'cargado':'falta')+'</span>'+
+      '<span class="nm">'+name+'</span>'+
+      '<span class="dt">'+(loaded?range:'sin CSV')+'</span></div>';
+  }
+  cont.innerHTML=html;
+  const btn=document.getElementById('calcBtn');
+  btn.disabled=!allLoaded;
+  btn.textContent = allLoaded ? 'Calcular' : 'Esperando las 4 divisas…';
+  return allLoaded;
+}
+
+// Rango de fechas disponible según el dataset del boliviano
+(function initCalcDate(){
+  const raw=CURRENCIES.bob.raw;
+  const inp=document.getElementById('calcDate');
+  if(raw&&raw.length){
+    const lastISO=new Date(raw[raw.length-1][0]*1000).toISOString().slice(0,10);
+    inp.max=lastISO; inp.value=lastISO;
+  }
+})();
+
+document.getElementById('calcBtn').addEventListener('click', ()=>{
+  const box=document.getElementById('calcResult');
+  if(!refreshCalcStatus()){
+    box.className='result on';
+    box.innerHTML='<p class="rnote rwarn">Faltan divisas por cargar. La calculadora se activa recién con las cuatro CSV cargadas.</p>';
+    return;
+  }
+  const val=document.getElementById('calcDate').value;
+  const usd=parseFloat(document.getElementById('calcAmount').value);
+  const target=document.getElementById('calcTarget').value;
+
+  if(!val){ box.className='result on'; box.innerHTML='<p class="rnote rwarn">Elegí una fecha.</p>'; return; }
+  if(!isFinite(usd)||usd<0){ box.className='result on'; box.innerHTML='<p class="rnote rwarn">Ingresá un monto válido en dólares.</p>'; return; }
+
+  const [y,m,d]=val.split('-').map(Number);
+  const dayEpoch=Date.UTC(y,m-1,d)/1000;
+
+  const bob=lookupBOB(dayEpoch);
+  if(!bob){
+    box.className='result on';
+    box.innerHTML='<p class="rnote rwarn">No hay datos del boliviano para esa fecha. Cargá el CSV del boliviano en el visor de arriba.</p>';
+    return;
+  }
+
+  const rate = calcOp==='buy' ? bob.sell : bob.buy;
+  const bs = usd*rate;
+  const opTxt = calcOp==='buy' ? 'Bolivianos que entregás' : 'Bolivianos que recibís';
+  const rateTxt = calcOp==='buy' ? 'Tasa de venta (blue)' : 'Tasa de compra (blue)';
+
+  let html='';
+  html+='<div class="rline"><span class="k">'+rateTxt+'</span><span class="v">'+fmtNum(rate,4)+' Bs/USD</span></div>';
+  html+='<div class="rline"><span class="k">Monto en dólares</span><span class="v">USD '+fmtNum(usd,2)+'</span></div>';
+  html+='<div class="rline big"><span class="k">'+opTxt+'</span><span class="v">Bs '+fmtNum(bs,2)+'</span></div>';
+
+  const notes=[];
+  if(bob.t!==dayEpoch) notes.push('Boliviano: sin dato en la fecha elegida, se usó la cotización del '+fmtDay(bob.t)+'.');
+
+  if(target){
+    const cfg=CURRENCIES[target];
+    const tv=lookupOHLC(target, dayEpoch);
+    if(!tv){
+      notes.push('⚠ '+cfg.pair+': todavía no cargaste su CSV (o no hay dato para esa fecha). Cargalo en el visor de arriba y volvé a calcular.');
+    } else {
+      const amount=usd*tv.close;
+      const dec = tv.close>=1000 ? 2 : 4;
+      const unit = target==='pen' ? 'S/' : (target==='clp' ? '$' : '$');
+      html+='<div class="rline"><span class="k">Cierre '+cfg.pair+'</span><span class="v">'+fmtNum(tv.close,4)+'</span></div>';
+      html+='<div class="rline big"><span class="k">Equivalente en '+cfg.pair.split('/')[1]+'</span><span class="v">'+unit+' '+fmtNum(amount,2)+'</span></div>';
+      if(tv.t!==dayEpoch) notes.push(cfg.pair+': sin dato en la fecha elegida (fin de semana o feriado), se usó el cierre del '+fmtDay(tv.t)+'.');
+    }
+  }
+
+  if(notes.length) html+='<p class="rnote">'+notes.map(n=>'· '+n).join('<br>')+'</p>';
+  box.className='result on';
+  box.innerHTML=html;
+});
+
+// Estado inicial
+applyCurrencyUI();
+refreshCalcStatus();
+</script>
+</body>
+</html>
