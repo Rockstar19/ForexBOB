@@ -168,6 +168,10 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>
     Cargar CSV
   </button>
+  <button class="databtn reset" id="forgetBtn" title="Borrar el CSV guardado en este navegador para la divisa activa">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3m-8 0l1 13a1 1 0 001 1h6a1 1 0 001-1l1-13"/></svg>
+    Olvidar guardado
+  </button>
   <input type="file" id="fileInput" accept=".csv,text/csv">
   <div class="range-note" id="loadHint">Boliviano: formato de 15 min. Otras divisas: formato diario de Investing.com.</div>
 </div>
@@ -998,6 +1002,38 @@ function parseInvesting(text){
 }
 
 // ---- Router de procesamiento ----
+// ============================================================
+// Persistencia local (localStorage): cuando cargás un CSV a mano,
+// su texto crudo queda guardado en ESTE navegador y se restaura al
+// reabrir la página. No toca el repo. Prioridad al abrir:
+//   localStorage  >  data/ del repo  >  vacío.
+// ============================================================
+const LS_PREFIX = 'visor_csv_';           // + key de divisa
+const LS_META   = 'visor_csv_meta_';      // + key (nombre de archivo + resumen)
+function lsAvailable(){
+  try{ const k='__t'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; }
+  catch(e){ return false; }
+}
+const HAS_LS = lsAvailable();
+function saveCSVLocal(key, text, meta){
+  if(!HAS_LS) return false;
+  try{ localStorage.setItem(LS_PREFIX+key, text); localStorage.setItem(LS_META+key, meta||''); return true; }
+  catch(e){ return false; } // p.ej. cuota excedida
+}
+function loadCSVLocal(key){
+  if(!HAS_LS) return null;
+  const t=localStorage.getItem(LS_PREFIX+key);
+  return t ? {text:t, meta:localStorage.getItem(LS_META+key)||''} : null;
+}
+function clearCSVLocal(key){
+  if(!HAS_LS) return;
+  localStorage.removeItem(LS_PREFIX+key); localStorage.removeItem(LS_META+key);
+}
+function anyCSVLocal(){
+  if(!HAS_LS) return false;
+  return Object.keys(CURRENCIES).some(k=>localStorage.getItem(LS_PREFIX+k));
+}
+
 function processCSVText(text, filename){
   overlay.classList.add('on'); overlayMsg.textContent='Leyendo archivo…';
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
@@ -1042,12 +1078,16 @@ function processCSVText(text, filename){
         }
       }
       currentLabel = (filename||'CSV cargado')+' · '+summary;
+      // Persistir el CSV crudo en este navegador para restaurarlo al reabrir
+      const saved = saveCSVLocal(curKey, text, (filename||'CSV cargado')+' · '+summary);
+      CURRENCIES[curKey].label = (filename||'CSV cargado')+' · '+summary+(saved?' · guardado en este navegador':'');
       document.getElementById('footNote').textContent =
-        'Fuente: '+(filename||'archivo cargado')+' · '+CURRENCIES[curKey].source+' · procesado en el navegador';
+        'Fuente: '+(filename||'archivo cargado')+' · '+CURRENCIES[curKey].source+
+        (saved?' · guardado en este navegador':' · procesado en el navegador');
       applyCurrencyUI();
       render(true);
       refreshCalcStatus();
-      showToast('Listo: '+summary+'.');
+      showToast('Listo: '+summary+(saved?' · guardado en este navegador.':'.'));
     }catch(err){
       showToast('Error al procesar el CSV: '+err.message, true);
     }finally{
@@ -1066,10 +1106,10 @@ document.getElementById('curGroup').addEventListener('click', e=>{
   applyCurrencyUI();
   if(cfg.raw){
     RAW=cfg.raw;
-    currentLabel = curKey==='bob' && cfg.raw===DEFAULT_RAW
+    currentLabel = (curKey==='bob' && cfg.raw===DEFAULT_RAW)
       ? 'dataset original ('+DEFAULT_RAW.length.toLocaleString('es-BO')+' velas horarias)'
-      : currentLabel;
-    document.getElementById('footNote').textContent = 'Fuente: '+cfg.source+' · procesado en el navegador';
+      : (cfg.label || currentLabel);
+    document.getElementById('footNote').textContent = 'Fuente: '+cfg.source+(cfg.label?' · cargado desde el repositorio':' · procesado en el navegador');
     render(true);
   } else {
     // sin datos aún para esta divisa: limpiar gráfico e invitar a cargar
@@ -1083,6 +1123,39 @@ document.getElementById('curGroup').addEventListener('click', e=>{
 });
 
 document.getElementById('loadBtn').addEventListener('click', ()=>document.getElementById('fileInput').click());
+document.getElementById('forgetBtn').addEventListener('click', async ()=>{
+  if(!HAS_LS){ showToast('Este navegador no permite guardado local.', true); return; }
+  if(!loadCSVLocal(curKey)){ showToast('No hay CSV guardado para '+CURRENCIES[curKey].pair+' en este navegador.'); return; }
+  clearCSVLocal(curKey);
+  CURRENCIES[curKey].raw = (curKey==='bob') ? DEFAULT_RAW : null;
+  CURRENCIES[curKey].label = null;
+  // intentar recargar desde el repo (si existe archivo) para esta divisa
+  const path=DATA_FILES[curKey];
+  if(path){
+    try{
+      const resp=await fetch(path,{cache:'no-store'});
+      if(resp.ok){
+        const text=await resp.text();
+        if(text && text.trim().length>=20){
+          const {raw,summary}=processForCurrency(curKey,text);
+          CURRENCIES[curKey].raw=raw;
+          CURRENCIES[curKey].label=path.split('/').pop()+' · '+summary+' · desde el repo';
+        }
+      }
+    }catch(e){}
+  }
+  const cfg=CURRENCIES[curKey];
+  applyCurrencyUI();
+  if(cfg.raw){ RAW=cfg.raw; currentLabel=cfg.label||currentLabel; render(true); }
+  else {
+    candleSeries.setData([]); offSeries.setData([]); smaSeries.setData([]); emaSeries.setData([]);
+    document.getElementById('candCount').textContent='';
+    document.getElementById('sSell').textContent='—';
+    document.getElementById('subtitle').textContent=cfg.pair+' · cargá el CSV de esta divisa para verla';
+  }
+  refreshCalcStatus();
+  showToast('Copia local de '+cfg.pair+' borrada.');
+});
 document.getElementById('fileInput').addEventListener('change', e=>{
   const f=e.target.files[0]; if(!f) return;
   const reader=new FileReader();
@@ -1238,9 +1311,107 @@ document.getElementById('calcBtn').addEventListener('click', ()=>{
   box.innerHTML=html;
 });
 
+// ============================================================
+// Autocarga de CSV crudos desde el repositorio (carpeta ./data/)
+// Procesa cada divisa con su parser, sin depender de cuál esté
+// seleccionada. Los archivos se sobreescriben vía Git: reemplazás
+// el CSV en el repo, hacés push y Vercel redespliega con datos nuevos.
+// El botón de carga manual sigue funcionando para pruebas.
+// ============================================================
+// Archivos de datos en el repo. El boliviano NO se autocarga por defecto:
+// ya viene precargado y liviano (velas horarias) en bob_data.js. Las otras
+// tres divisas se cargan de sus CSV crudos. Para actualizar cualquiera,
+// reemplazá el archivo correspondiente en el repo y hacé push.
+//   · Boliviano: regenerá bob_data.js, o descomentá la línea 'bob' de abajo
+//     y poné data/usd_bob.csv (más pesado, se procesa en cada visita).
+const DATA_FILES = {
+  // bob:  'data/usd_bob.csv',   // (opcional) descomentar para servir el boliviano desde CSV crudo
+  pen:  'data/usd_pen.csv',
+  clp:  'data/usd_clp.csv',
+  arsb: 'data/usd_arsb.csv',
+};
+
+// Procesa texto CSV para UNA divisa dada (no la activa). Devuelve {raw, summary} o lanza.
+function processForCurrency(key, text){
+  const mode = CURRENCIES[key].mode;
+  const fmt = detectFormat(text);
+  if(mode==='bob'){
+    if(fmt!=='bob') throw new Error('formato inesperado para boliviano');
+    let rows=parseBob(text);
+    if(rows.length<10) throw new Error('pocas filas (boliviano)');
+    const before=rows.length;
+    rows=rows.filter(r=>r.bb>=5 && r.bs>=5);
+    rows=despike(rows,'bb'); rows=despike(rows,'bs');
+    const raw=toHourlyRaw(rows);
+    return {raw, summary: before.toLocaleString('es-BO')+' registros → '+raw.length.toLocaleString('es-BO')+' velas horarias'};
+  } else {
+    if(fmt!=='investing') throw new Error('formato inesperado (se esperaba Investing.com)');
+    const raw=parseInvesting(text);
+    if(raw.length<5) throw new Error('pocas filas (Investing.com)');
+    return {raw, summary: raw.length.toLocaleString('es-BO')+' velas diarias'};
+  }
+}
+
+// Carga inicial de datos. Prioridad por divisa:
+//   1) localStorage (lo último cargado a mano en este navegador)
+//   2) data/ del repo (fetch)
+//   3) nada (queda pendiente de carga manual)
+async function autoloadFromRepo(){
+  const results=[];
+  const allKeys = Object.keys(CURRENCIES);
+  for(const key of allKeys){
+    // 1) localStorage primero
+    const local = loadCSVLocal(key);
+    if(local){
+      try{
+        const {raw, summary} = processForCurrency(key, local.text);
+        CURRENCIES[key].raw = raw;
+        CURRENCIES[key].label = (local.meta||summary)+' · desde este navegador';
+        results.push(key);
+        continue; // no consultar el repo si ya hay copia local
+      }catch(e){ clearCSVLocal(key); /* copia local corrupta: descartar */ }
+    }
+    // 2) repo (solo divisas con archivo declarado en DATA_FILES)
+    const path = DATA_FILES[key];
+    if(!path) continue;
+    try{
+      const resp = await fetch(path, {cache:'no-store'});
+      if(!resp.ok) continue;
+      const text = await resp.text();
+      if(!text || text.trim().length<20) continue;
+      const {raw, summary} = processForCurrency(key, text);
+      CURRENCIES[key].raw = raw;
+      CURRENCIES[key].label = path.split('/').pop()+' · '+summary+' · desde el repo';
+      results.push(key);
+    }catch(e){ /* archivo ausente o inválido: se deja para carga manual */ }
+  }
+  // refrescar la vista de la divisa activa y el estado de la calculadora
+  if(results.length){
+    const cfg=CURRENCIES[curKey];
+    if(cfg.raw){
+      RAW=cfg.raw;
+      if(cfg.label) currentLabel=cfg.label;
+      const fn=document.getElementById('footNote');
+      if(fn) fn.textContent='Fuente: '+cfg.source+' · '+(cfg.label&&cfg.label.includes('navegador')?'guardado en este navegador':'cargado desde el repositorio');
+    }
+    applyCurrencyUI();
+    render(true);
+    if(CURRENCIES.bob.raw && CURRENCIES.bob.raw.length){
+      const inp=document.getElementById('calcDate');
+      if(inp){
+        const braw=CURRENCIES.bob.raw;
+        const lastISO=new Date(braw[braw.length-1][0]*1000).toISOString().slice(0,10);
+        inp.max=lastISO; if(!inp.value||inp.value>lastISO) inp.value=lastISO;
+      }
+    }
+    refreshCalcStatus();
+  }
+}
+
 // Estado inicial
 applyCurrencyUI();
 refreshCalcStatus();
+autoloadFromRepo();
 </script>
 </body>
 </html>
